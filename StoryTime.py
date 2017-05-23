@@ -14,7 +14,7 @@ class StorytimeArchitecture:
         self.create_placeholders()
         self.main_input()
         self.path = components.encoder_prenet(self.main_input)
-        self.path = components.encoder_cbhg(self.path)
+        self.path = components.encoder_cbhg(self.path, self.main_input)
 
     # TODO: missing placeholder from assign 2, feed dict 
     def create_placeholders(self):
