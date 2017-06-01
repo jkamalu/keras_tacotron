@@ -19,11 +19,9 @@ def encoder_prenet(inputs):
     return Dropout(0.5)(prenet_output)
 
 def convolutional_bank(inputs):
-    convolutions = Conv1D(CONFIG.embed_size // 2, 1)(inputs)
-    print("convolutional_bank: %s" % convolutions.get_shape())
+    convolutions = Conv1D(CONFIG.embed_size // 2, 1, padding='same')(inputs)
     for i in range(2, CONFIG.num_conv_regions + 1):
-        conv = Conv1D(CONFIG.embed_size // 2, i)(inputs)
-        print("conv: %s" % conv.get_shape())
+        conv = Conv1D(CONFIG.embed_size // 2, i, padding='same')(inputs)
         norm = BatchNormalization()(conv)
         convolutions = tf.concat((convolutions, conv), -1)
     print("convolutional_bank: %s" % convolutions.get_shape())
