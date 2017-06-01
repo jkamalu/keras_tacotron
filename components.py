@@ -1,10 +1,16 @@
 import tensorflow as tf
+from keras import backend as K
 
 from keras.layers import Dense, Dropout, Conv1D, BatchNormalization, MaxPooling1D, GRU, Bidirectional, Lambda
 from keras.layers.merge import Add, Multiply, Concatenate
 from keras.initializers import Constant
 
 from config import CONFIG
+
+def encoder_embedding(inputs):
+    output_shape = (CONFIG.seq_length, CONFIG.embed_size)
+    embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
+    return embedding
 
 def encoder_prenet(inputs):
     prenet_output = Dense(CONFIG.embed_size, activation='relu')(inputs)
@@ -39,12 +45,14 @@ def encoder_cbhg(inputs, residual_input=None):
     max_pooling = MaxPooling1D(pool_size=2, strides=1, padding='same')(convolutions)
     # convolutional projections
     projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='relu')(max_pooling)
+    norm = BatchNormalization()(projection)
     projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='linear')(projection)
+    norm = BatchNormalization()(projection)
     # residual connection
     if residual_input is not None: 
-        residual = Add()([projection, residual_input])
+        residual = Add()([norm, residual_input])
     else:
-        residual = projection
+        residual = norm
     # highway network
     highway = highway_network(residual, 4)
     # bidirectional gru
