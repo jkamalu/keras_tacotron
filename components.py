@@ -43,10 +43,11 @@ def encoder_cbhg(inputs, residual_input=None):
     # convolutional bank
     convolutions = convolutional_bank(inputs)
     # max pooling
-    max_pooling = MaxPooling1D(pool_size=2, strides=1)(convolutions)
+    max_pooling = MaxPooling1D(pool_size=2, strides=1, padding='same')(convolutions)
+    print("max_pooling: %s" % max_pooling.get_shape())
     # convolutional projections
-    projection = Conv1D(CONFIG.embed_size // 2, 3, activation='relu')(max_pooling)
-    projection = Conv1D(CONFIG.embed_size // 2, 3, activation='linear')(projection)
+    projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='relu')(max_pooling)
+    projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='linear')(projection)
     # residual connection
     print("projection, residual: %s, %s" % (projection.get_shape(), residual_input.get_shape()))
     if residual_input is not None: 
