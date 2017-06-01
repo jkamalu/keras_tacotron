@@ -1,12 +1,8 @@
 import tensorflow as tf
 
-from keras.layers.core import Dense, Dropout
-from keras.layers.convolutional import Conv1D
-from keras.layers.normalization import BatchNormalization
-from keras.layers.pooling import MaxPooling1D
-from keras.layers.recurrent import GRU
-from keras.layers.wrappers import Bidirectional
-from keras.layers.merge import Add, Multiply
+from keras import backend as K
+from keras.layers import Dense, Dropout, Conv1D, BatchNormalization, MaxPooling1D, GRU, Bidirectional, Lambda
+from keras.layers.merge import Add, Multiply, Concatenate
 from keras.initializers import Constant
 
 from config import CONFIG
@@ -23,7 +19,7 @@ def convolutional_bank(inputs):
     for i in range(2, CONFIG.num_conv_regions + 1):
         conv = Conv1D(CONFIG.embed_size // 2, i, padding='same')(inputs)
         norm = BatchNormalization()(conv)
-        convolutions = tf.concat((convolutions, conv), -1)
+        convolutions = Concatenate()([convolutions, conv])
     print("convolutional_bank: %s" % convolutions.get_shape())
     return convolutions
 
@@ -34,8 +30,8 @@ def highway_network(inputs, num_layers=1):
     for i in range(num_layers):
         H = Dense(128, activation='relu')(layer_inputs)
         T = Dense(128, activation='sigmoid', use_bias=True, bias_initializer=Constant(-1))(layer_inputs)
-        C = 1. - T
-        layer_inputs = H * T + inputs * C
+        C = Lambda(lambda x: 1. - x)(T)
+        layer_inputs = Add()([Multiply()([H, T]), Multiply()([inputs, C])])
     print("highway_network: %s" % layer_inputs.get_shape())
     return layer_inputs
 

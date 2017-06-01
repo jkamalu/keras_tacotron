@@ -16,6 +16,8 @@ class StorytimeArchitecture:
         self.path = components.encoder_prenet(self.main_input)
         self.path = components.encoder_cbhg(self.path, self.path)
         self.main_output = self.path
+        model = Model(inputs=self.main_input, outputs=self.main_output)
+
 
     # TODO: missing placeholder from assign 2, feed dict 
     def create_placeholders(self):
@@ -30,8 +32,8 @@ class StorytimeArchitecture:
 if __name__ == "__main__":
     architecture = StorytimeArchitecture()
 
-    model = Model(inputs=architecture.main_input, outputs=architecture.main_output)
-    #model.compile()
+    # model = Model(inputs=architecture.main_input, outputs=architecture.main_output)
+    # model.compile()
     # # Generate dummy data
     # import numpy as np
     # data = np.random.random((1000, 100))
