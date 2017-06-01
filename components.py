@@ -8,7 +8,6 @@ from keras.initializers import Constant
 from config import CONFIG
 
 def encoder_embedding(inputs):
-    output_shape = (CONFIG.seq_length, CONFIG.embed_size)
     embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
     return embedding
 
@@ -54,7 +53,8 @@ def encoder_cbhg(inputs, residual_input=None):
     else:
         residual = norm
     # highway network
-    highway = highway_network(residual, 4)
+    highway = highway_network(residual, num_layers=4)
+    print("pre-gru: %s" % highway.get_shape())
     # bidirectional gru
     bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2))(highway)
     return bidirectional_gru
