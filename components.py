@@ -11,6 +11,22 @@ from keras.initializers import Constant
 
 from config import CONFIG
 
+def attention(inputs, memory, num_units=256):
+    # Tensorflow underlying code to support Bahdanau attention
+    # Returns a tensorflow
+    def attend(inp, mem):
+        # The attention component will be in control of attending to the given memory
+        attention = tf.contrib.seq2seq.BahdanauAttention(num_units, mem)
+        cell = tf.contrib.rnn.GRUCell(num_units)
+
+        cell_with_attention = tf.contrib.seq2seq.DynamicAttentionWrapper(cell, attention, num_units)
+        outputs, _ = tf.nn.dynamic_rnn(cell_with_attention, inp, dtype=tf.float32)
+        return outputs
+
+    # output should be [batches, timesteps, num_units]
+    return Lambda(attend, output_shape=(b,t,num_units))(inputs, memory)
+
+
 def encoder_prenet(inputs):
     prenet_output = Dense(256, activation='relu')(inputs)
     prenet_output = Dropout(0.5)(prenet_output)
@@ -50,7 +66,7 @@ def encoder_cbhg(inputs, residual_input=None):
     projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='linear')(projection)
     # residual connection
     print("projection, residual: %s, %s" % (projection.get_shape(), residual_input.get_shape()))
-    if residual_input is not None: 
+    if residual_input is not None:
         residual = Add()([projection, residual_input])
     else:
         residual = projection
@@ -60,9 +76,3 @@ def encoder_cbhg(inputs, residual_input=None):
     bidirectional_gru = Bidirectional(GRU(128))(highway)
     print("encoder_cbhg: %s" % bidirectional_gru.get_shape())
     return bidirectional_gru
-
-
-
-
-
-
