@@ -7,9 +7,13 @@ from keras.initializers import Constant
 
 from config import CONFIG
 
+# with tf.name_scope('block1'):
+#     y = LSTM(32, name='mylstm')(x)
+
 def encoder_embedding(inputs):
-    embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
-    return embedding
+    with tf.name_scope('encoder_embedding'):
+        embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
+        return embedding
 
 def encoder_prenet(inputs):
     prenet_output = Dense(CONFIG.embed_size, activation='relu')(inputs)
@@ -38,26 +42,26 @@ def highway_network(inputs, num_layers=1):
     return layer_inputs
 
 def encoder_cbhg(inputs, residual_input=None):
-    # convolutional bank
-    convolutions = convolutional_bank(inputs)
-    # max pooling
-    max_pooling = MaxPooling1D(pool_size=2, strides=1, padding='same')(convolutions)
-    # convolutional projections
-    projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='relu')(max_pooling)
-    norm = BatchNormalization()(projection)
-    projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='linear')(projection)
-    norm = BatchNormalization()(projection)
-    # residual connection
-    if residual_input is not None: 
-        residual = Add()([norm, residual_input])
-    else:
-        residual = norm
-    # highway network
-    highway = highway_network(residual, num_layers=4)
-    print("pre-gru: %s" % highway.get_shape())
-    # bidirectional gru
-    bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2))(highway)
-    return bidirectional_gru
+    with tf.name_scope('encoder_cbhg'):
+        # convolutional bank
+        convolutions = convolutional_bank(inputs)
+        # max pooling
+        max_pooling = MaxPooling1D(pool_size=2, strides=1, padding='same')(convolutions)
+        # convolutional projections
+        projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='relu')(max_pooling)
+        norm = BatchNormalization()(projection)
+        projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='linear')(projection)
+        norm = BatchNormalization()(projection)
+        # residual connection
+        if residual_input is not None: 
+            residual = Add()([norm, residual_input])
+        else:
+            residual = norm
+        # highway network
+        highway = highway_network(residual, num_layers=4)
+        # bidirectional gru
+        bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2))(highway)
+        return bidirectional_gru
 
 
 
