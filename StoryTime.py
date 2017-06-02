@@ -10,7 +10,6 @@ class StorytimeArchitecture:
         self.main_input()
         self.path = components.encoder_prenet(self.main_input)
         self.path = components.encoder_cbhg(self.path, self.path)
-        print("encoder_output: %s" % self.path.get_shape())
         self.main_output = self.path
 
     def main_input(self):
@@ -19,6 +18,14 @@ class StorytimeArchitecture:
 if __name__ == "__main__":
     architecture = StorytimeArchitecture()
     model = Model(inputs=architecture.main_input, outputs=architecture.main_output)
+
+
+    #Running the model
+    #Paper uses the adam optimizer and l1 loss which is based on absolute error
+    #we are tracking accuracy metrics, this does not influence the model's training though
+    #loss_weights is a non-specified quantity in the paper but it must be the same whenever it is used
+        #thus the reason for the use of the config variable, should be in list format
+    model.compile(optimizer='adam', loss = 'mean_absolute_error', metrics=['accuracy'], loss_weights=config.loss_weights)
 
     # model.compile()
     # # Generate dummy data

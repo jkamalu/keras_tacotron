@@ -41,18 +41,14 @@ def encoder_cbhg(inputs, residual_input=None):
     projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='relu')(max_pooling)
     projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='linear')(projection)
     # residual connection
-    if residual_input is not None: 
+    if residual_input is not None:
         residual = Add()([projection, residual_input])
     else:
         residual = projection
     # highway network
     highway = highway_network(residual, 4)
+
     # bidirectional gru
-    bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2))(highway)
+    bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True))(highway)
+
     return bidirectional_gru
-
-
-
-
-
-
