@@ -87,12 +87,3 @@ if __name__ == "__main__":
     with sess.as_default():
         evaluation = acc_value.eval(feed_dict=architecture.feed_dict(train, target))
 
-
-
-
-
-
-
-
-
-
