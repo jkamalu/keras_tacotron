@@ -6,7 +6,14 @@ class CONFIG:
     loss_weights = 1
 
     # Audio
-    window_type = "hann"
-    fourier_transform_quantity = 2048
-    frame_length = 0.050*fourier_transform_quantity
-    frame_shift = 0.0125*fourier_transform_quantity
+    audio_sample_rate = 22050
+    audio_window_type = "hann"
+    audio_fourier_transform_quantity = 2048
+    audio_frame_length = 0.050
+    audio_frame_shift = 0.0125
+    audio_mel_magnitude_exp = 1.2
+    audio_mel_banks = 80
+    audio_inversion_iterations = 30
+
+    audio_hop_length = int(audio_sample_rate*audio_frame_shift)
+    audio_window_length = int(audio_sample_rate*audio_frame_length)
