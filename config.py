@@ -9,3 +9,4 @@ class CONFIG:
     num_mel_bands = 80
 
     num_conv_regions = 16
+    reduction_factor = 5
