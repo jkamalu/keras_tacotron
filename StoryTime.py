@@ -12,13 +12,14 @@ from config import CONFIG
 import components
 import data
 
+# The Storytime model expects a one-hot tensor of character embeddings as input
 class StorytimeArchitecture:
 
     def __init__(self):
         self.placeholders()
         self.model_input()
-        self.path = components.encoder_embedding(self.model_input)
-        self.path = components.prenet(self.path)
+        #self.path = components.encoder_embedding(self.model_input)
+        self.path = components.prenet(self.model_input)
         self.path = components.encoder_cbhg(self.path, self.path)
         print("encoder_output: %s" % self.path.get_shape())
         self.model_output()
@@ -83,10 +84,3 @@ if __name__ == "__main__":
 
         # Test model
         evaluation = acc_value.eval(feed_dict=architecture.feed_dict(eval_features, eval_targets))
-
-
-
-
-
-
-        
