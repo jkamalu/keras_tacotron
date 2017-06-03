@@ -12,19 +12,25 @@ def encoder_embedding(inputs):
         embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
         return embedding
 
-def seq_decoder(inputs, memory):
-    prenet_inputs = prenet(inputs)
+def seq_decoder(inputs, memory, scope="decoder1", reuse=None):
+    with tf.variable_scope(scope, reuse=reuse):
+        prenet_inputs = prenet(inputs)
 
-    dec = attention(prenet_inputs, memory, variable_scope="attention_decoder1")      #Might want to separate into variable scopes
-    dec = Add()([dec, attention(dec, memory, variable_scope="attention_decoder2")])
+        dec = attention(prenet_inputs, memory, variable_scope="attention_decoder1")
 
-    #we need to capture reduction_factor frames with mel_bank features each, hence the multiplied dimensionality
-    out_dim = CONFIG.audio_mel_banks*CONFIG.reduction_factor
+        #By maintaining the tf variable scope within the two layers it should allow for weights to be passed horizontally
+        #Else we might need to implement our own GRU or use a pure TF one
+        with tf.variable_scope("decoder_rnn1"):
+            #just uses attention as input rather than residual, which seems more faithful to the paper than other
+            #implementations, old form is:
+                #dec = Add()([dec, GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)])
+            dec = GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)
+            dec = Add()([dec, GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)])
 
-    #original uses a fully connected layer, whereas we use a dense layer
-    #If this presents problems take a look at simpleRNN
-    outputs = Dense(out_dim)(dec)
-    return outputs
+        #we need to capture reduction_factor frames with mel_bank features each, hence the multiplied dimensionality
+        out_dim = CONFIG.audio_mel_banks*CONFIG.reduction_factor
+        outputs = Dense(out_dim)(dec)
+        return outputs
 
 def decoder_cbhg(inputs):
     with tf.name_scope('decoder_cbhg'):
@@ -46,7 +52,7 @@ def decoder_cbhg(inputs):
         # highway network
         highway = highway_network(residual, num_layers=4)
         # bidirectional gru
-        bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True))(highway)
+        bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True, implementation=CONFIG.gru_implementation))(highway)
         return bidirectional_gru
 
 def attention(inputs, memory, num_units=256, variable_scope="attention_decoder"):
@@ -59,6 +65,8 @@ def attention(inputs, memory, num_units=256, variable_scope="attention_decoder")
             cell = tf.contrib.rnn.GRUCell(num_units)
 
             cell_with_attention = tf.contrib.seq2seq.DynamicAttentionWrapper(cell, attention, num_units)
+            #second output is the state, paper mentions we want a stateful recurrent
+                #layer to produce the attn query at each decoder timestep, so might need to use it
             outputs, _ = tf.nn.dynamic_rnn(cell_with_attention, inp, dtype=tf.float32)
             return outputs
 
@@ -113,5 +121,5 @@ def encoder_cbhg(inputs, residual_input=None):
         # highway network
         highway = highway_network(residual, num_layers=4)
         # bidirectional gru
-        bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True))(highway)
+        bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True, implementation=CONFIG.gru_implementation))(highway)
         return bidirectional_gru

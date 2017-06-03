@@ -22,3 +22,6 @@ class CONFIG:
     audio_window_length = int(audio_sample_rate*audio_frame_length)
 
     reduction_factor = 5
+
+    #May improve performance when set to 2, default 0 formats matrix for cpu computation while 2 parallelizes
+    gru_implementation = 0
