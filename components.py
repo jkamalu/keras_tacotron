@@ -7,10 +7,10 @@ from keras.initializers import Constant
 
 from config import CONFIG
 
-def encoder_embedding(inputs):
-    with tf.name_scope('encoder_embedding'):
-        embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
-        return embedding
+#def encoder_embedding(inputs):
+#    with tf.name_scope('encoder_embedding'):
+#        embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
+#        return embedding
 
 def seq_decoder(inputs, memory, scope="decoder1", reuse=None):
     with tf.variable_scope(scope, reuse=reuse):
