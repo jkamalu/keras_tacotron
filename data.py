@@ -1,4 +1,4 @@
-import numpy as np 
+import numpy as np
 
 # Generate dummy data
 # dummy_train_data = []; dummy_target_data = []

@@ -18,7 +18,9 @@ def seq_decoder(inputs, memory):
     dec = attention(prenet_inputs, memory, variable_scope="attention_decoder1")      #Might want to separate into variable scopes
     dec = Add()([dec, attention(dec, memory, variable_scope="attention_decoder2")])
 
-    out_dim = CONFIG.num_mel_bands*CONFIG.reduction_factor
+    #we need to capture reduction_factor frames with mel_bank features each, hence the multiplied dimensionality
+    out_dim = CONFIG.audio_mel_banks*CONFIG.reduction_factor
+
     #original uses a fully connected layer, whereas we use a dense layer
     #If this presents problems take a look at simpleRNN
     outputs = Dense(out_dim)(dec)
