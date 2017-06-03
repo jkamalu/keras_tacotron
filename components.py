@@ -7,6 +7,11 @@ from keras.initializers import Constant
 
 from config import CONFIG
 
+def encoder_embedding(inputs):
+    with tf.name_scope('encoder_embedding'):
+        embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
+        return embedding
+
 def attention(inputs, memory, num_units=256):
     # Tensorflow underlying code to support Bahdanau attention
     # Returns a tensorflow
@@ -23,7 +28,7 @@ def attention(inputs, memory, num_units=256):
     #return Lambda(attend, output_shape=(b,t,num_units))(inputs, memory)
     return Lambda(attend)(inputs, memory)
 
-def encoder_prenet(inputs):
+def prenet(inputs):
     prenet_output = Dense(CONFIG.embed_size, activation='relu')(inputs)
     prenet_output = Dropout(0.5)(prenet_output)
     prenet_output = Dense(CONFIG.embed_size // 2, activation='relu')(prenet_output)
@@ -50,26 +55,23 @@ def highway_network(inputs, num_layers=1):
     return layer_inputs
 
 def encoder_cbhg(inputs, residual_input=None):
-    # convolutional bank
-    convolutions = convolutional_bank(inputs)
-    # max pooling
-    max_pooling = MaxPooling1D(pool_size=2, strides=1, padding='same')(convolutions)
-    # convolutional projections
-    projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='relu')(max_pooling)
-    norm = BatchNormalization()(projection)
-    projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='linear')(projection)
-    norm = BatchNormalization()(projection)
-    # residual connection
-
-    if residual_input is not None:
-        residual = Add()([norm, residual_input])
-    else:
-        residual = norm
-    # highway network
-
-    highway = highway_network(residual, num_layers=4)
-
-    # bidirectional gru
-    bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True))(highway)
-
-    return bidirectional_gru
+    with tf.name_scope('encoder_cbhg'):
+        # convolutional bank
+        convolutions = convolutional_bank(inputs)
+        # max pooling
+        max_pooling = MaxPooling1D(pool_size=2, strides=1, padding='same')(convolutions)
+        # convolutional projections
+        projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='relu')(max_pooling)
+        norm = BatchNormalization()(projection)
+        projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='linear')(projection)
+        norm = BatchNormalization()(projection)
+        # residual connection
+        if residual_input is not None: 
+            residual = Add()([norm, residual_input])
+        else:
+            residual = norm
+        # highway network
+        highway = highway_network(residual, num_layers=4)
+        # bidirectional gru
+        bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True))(highway)
+        return bidirectional_gru
