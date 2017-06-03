@@ -18,6 +18,7 @@ class CONFIG:
     audio_mel_magnitude_exp = 1.2
     audio_mel_banks = 80
     audio_inversion_iterations = 30
-
     audio_hop_length = int(audio_sample_rate*audio_frame_shift)
     audio_window_length = int(audio_sample_rate*audio_frame_length)
+
+    reduction_factor = 5
