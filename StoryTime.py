@@ -76,10 +76,17 @@ if __name__ == "__main__":
                 if batch is None: break
                 feat, target = batch
                 optimizer.run(feed_dict=architecture.feed_dict(feat, target, is_training=True))
-            print("Epoch %s finished" % i)
+            # Save model
+            saver.save(sess, args.save_to_file, global_step=i)
 
-        # Save model
-        saver.save(sess, args.save_to_file)
+            print("Epoch %s finished" % i)
 
         # Test model
         evaluation = acc_value.eval(feed_dict=architecture.feed_dict(eval_features, eval_targets))
+
+
+
+
+
+
+        
