@@ -28,7 +28,7 @@ def attention(inputs, memory, num_units=256):
     #return Lambda(attend, output_shape=(b,t,num_units))(inputs, memory)
     return Lambda(attend)(inputs, memory)
 
-def encoder_prenet(inputs):
+def prenet(inputs):
     prenet_output = Dense(CONFIG.embed_size, activation='relu')(inputs)
     prenet_output = Dropout(0.5)(prenet_output)
     prenet_output = Dense(CONFIG.embed_size // 2, activation='relu')(prenet_output)
@@ -75,4 +75,3 @@ def encoder_cbhg(inputs, residual_input=None):
         # bidirectional gru
         bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True))(highway)
         return bidirectional_gru
-        

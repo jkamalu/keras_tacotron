@@ -1,10 +1,11 @@
+import argparse
+
 import numpy as np
 import tensorflow as tf
 from keras import backend as K
 
 from keras.layers import Input
 from keras.models import Model
-from keras.preprocessing import sequence
 from keras.metrics import categorical_accuracy
 
 from config import CONFIG
@@ -17,14 +18,15 @@ class StorytimeArchitecture:
         self.placeholders()
         self.model_input()
         self.path = components.encoder_embedding(self.model_input)
-        self.path = components.encoder_prenet(self.path)
+        self.path = components.prenet(self.path)
         self.path = components.encoder_cbhg(self.path, self.path)
         print("encoder_output: %s" % self.path.get_shape())
         self.model_output()
 
     def placeholders(self):
         self.inputs_placeholder = K.placeholder(shape=(None, None))
-        self.targets_placeholder = K.placeholder(shape=(None, None))
+        # targets placeholder shape undecided, dependent on target label representation
+        self.targets_placeholder = K.placeholder(shape=(None, None, None))
 
     def feed_dict(self, inputs_batch, targets_batch, is_training=False):
         feed_dict = {}
@@ -40,26 +42,14 @@ class StorytimeArchitecture:
         self.model_output = self.path
 
 if __name__ == "__main__":
-    # Generate dummy data
-    dummy_train_data = []; dummy_target_data = []
-    dummy_num_samples = CONFIG.batch_size * 4
-    dummy_vocab_size = CONFIG.embed_size
-    dummy_max_length = 50
-    for i in range(dummy_num_samples):
-        timesteps = np.random.randint(dummy_max_length, size=1)[0]
-        train_batch = np.random.randint(dummy_vocab_size, size=timesteps)
-        target_batch = np.random.randint(dummy_vocab_size, size=CONFIG.embed_size)
-        dummy_train_data.append(train_batch.tolist())
-        dummy_target_data.append(target_batch.tolist())
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--train_path', nargs='?', default='./train', type=str)
+    parser.add_argument('--eval_path', nargs='?', default='./eval', type=str)
+    parser.add_argument('--save_model_file', nargs='?', default='./saved_model', type=str)
+    args = parser.parse_args()
 
-    # Must be accounted for after data has been loaded
-    train_data = dummy_train_data
-    target_data = dummy_target_data
-    num_samples = dummy_num_samples
-
-    # Pad inputs
-    train_data = sequence.pad_sequences(train_data, padding='post', value=0)
-    target_data = sequence.pad_sequences(target_data, padding='post', value=0)
+    train_features, train_targets = data.load_data(args.train_path)
+    eval_features, eval_targets = data.load_data(args.eval_path)
 
     # Build graph
     architecture = StorytimeArchitecture()
@@ -69,21 +59,27 @@ if __name__ == "__main__":
 
     loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.targets_placeholder, architecture.model_output))
     optimizer = tf.train.AdamOptimizer(CONFIG.learning_rate).minimize(loss)
+    acc_value = categorical_accuracy(architecture.targets_placeholder, architecture.model_output)
 
     init_op = tf.global_variables_initializer()
+    saver = tf.train.Saver(tf.trainable_variables())
     sess.run(init_op)
 
-    generate_batch = data.generate_batch(train_data, target_data, CONFIG.batch_size)
-    batches_per_epoch = math.ceil(num_samples) 
-
     with sess.as_default():
-        while True:
-            batch = next(generate_batch)
-            if batch is None: break
-            train, target = batch
-            optimizer.run(feed_dict=architecture.feed_dict(train, target, is_training=True))
+        #Train model
+        for i in range(CONFIG.num_epochs):
+            np.random.shuffle(train_features)
+            np.random.shuffle(train_targets)
+            generate_batch = data.generate_batch(train_features, train_targets, CONFIG.batch_size)
+            while True:
+                batch = next(generate_batch)
+                if batch is None: break
+                feat, target = batch
+                optimizer.run(feed_dict=architecture.feed_dict(feat, target, is_training=True))
+            print("Epoch %s finished" % i)
 
-    acc_value = categorical_accuracy(architecture.targets_placeholder, architecture.model_output)
-    with sess.as_default():
-        evaluation = acc_value.eval(feed_dict=architecture.feed_dict(train, target))
+        # Save model
+        saver.save(sess, args.save_to_file)
 
+        # Test model
+        evaluation = acc_value.eval(feed_dict=architecture.feed_dict(eval_features, eval_targets))
