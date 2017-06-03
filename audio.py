@@ -54,5 +54,5 @@ def spectrogram2wav(spectrogram):
 
     return np.real(X_t)
 
-melSpectrogram, linearSpectrogram = get_spectrograms("example.wav")
-wavfile.write("example_output.wav", config.audio_sample_rate, spectrogram2wav(linearSpectrogram))
+#melSpectrogram, linearSpectrogram = get_spectrograms("example.wav")
+#wavfile.write("example_output.wav", config.audio_sample_rate, spectrogram2wav(linearSpectrogram))

@@ -7,10 +7,10 @@ from keras.initializers import Constant
 
 from config import CONFIG
 
-def encoder_embedding(inputs):
-    with tf.name_scope('encoder_embedding'):
-        embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
-        return embedding
+#def encoder_embedding(inputs):
+#    with tf.name_scope('encoder_embedding'):
+#        embedding = Lambda(lambda x: tf.one_hot(tf.to_int32(x), depth=CONFIG.embed_size))(inputs)
+#        return embedding
 
 def attention(inputs, memory, num_units=256):
     # Tensorflow underlying code to support Bahdanau attention
@@ -66,7 +66,7 @@ def encoder_cbhg(inputs, residual_input=None):
         projection = Conv1D(CONFIG.embed_size // 2, 3, padding='same', activation='linear')(projection)
         norm = BatchNormalization()(projection)
         # residual connection
-        if residual_input is not None: 
+        if residual_input is not None:
             residual = Add()([norm, residual_input])
         else:
             residual = norm
