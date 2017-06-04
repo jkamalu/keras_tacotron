@@ -53,7 +53,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--train_path', nargs='?', default='./train', type=str)
     parser.add_argument('--eval_path', nargs='?', default='./eval', type=str)
-    parser.add_argument('--save_model_file', nargs='?', default='./saved_model', type=str)
+    parser.add_argument('--save_model_file', nargs='?', default='./models/saved_model', type=str)
     args = parser.parse_args()
 
     train_feature_batches, train_mel_batches, train_mag_batches = data.load_data(args.train_path)

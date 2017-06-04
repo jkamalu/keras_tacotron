@@ -8,6 +8,7 @@ import audio
 # input -> raw text string
 # output -> a numpy matrix of (seqlens, 256)
 def text_to_sequence(text):
+    text = re.sub(r'[^A-z]+', ' ', text)
     # split text into a list by character
     # returns the index (row) of where they should appear
     hot_indexes = one_hot(' '.join(list(text)), CONFIG.embed_size, lower=False)
@@ -30,7 +31,6 @@ def load_texts(dir_str):
             file = open(file_path)
             text = file.read()
         except IOError as err: break
-        text = re.sub(r'[^A-z]+', ' ', text)
         texts.append(text_to_sequence(text))
         i += 1
     return texts
