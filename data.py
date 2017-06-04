@@ -85,7 +85,7 @@ def make_batches(texts, sounds, batch_size):
 
 def load_data(dir_str, batch_size=None):
 	texts = load_texts(dir_str)
-	sounds = load_sounds(dir_str):
+	sounds = load_sounds(dir_str)
 	return make_batches(texts, sounds, batch_size)
 
 def generate_batch(train_batches, target_batches):

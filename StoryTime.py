@@ -22,8 +22,14 @@ class StorytimeArchitecture:
         self.model_input = self.inputs_placeholder
         # Encoder
         self.path = components.prenet(self.model_input)
-        self.path = components.encoder_cbhg(self.path, self.path)
+        self.memory = components.encoder_cbhg(self.path, self.path)
         # Decoder
+        #TODO: determine what inputs to pass to decoder
+        N,T,_ = self.memory.get_shape()
+        #go_frame = tf.zeros(self.inputs_placeholder, dtype=tf.int32)    #0 filled tensor
+        self.model_output_mel = components.seq_decoder(self.inputs_placeholder, self.memory)
+        #self.model_output_mel = self
+        self.path = components.decoder_cbhg(self.path)
 
         # Magnitude output
         self.model_output_mag = self.path
