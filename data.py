@@ -5,18 +5,6 @@ from keras.preprocessing.text import one_hot
 from config import CONFIG
 import audio
 
-# Generate dummy data
-# dummy_train_data = []; dummy_target_data = []
-# dummy_num_samples = CONFIG.batch_size * 4
-# dummy_vocab_size = CONFIG.embed_size
-# dummy_max_length = 50
-# for i in range(dummy_num_samples):
-#     timesteps = np.random.randint(dummy_max_length, size=1)[0]
-#     train_batch = np.random.randint(dummy_vocab_size, size=timesteps)
-#     target_batch = np.random.randint(dummy_vocab_size, size=CONFIG.embed_size)
-#     dummy_train_data.append(train_batch.tolist())
-#     dummy_target_data.append(target_batch.tolist())
-
 # input -> raw text string
 # output -> a numpy matrix of (seqlens, 256)
 def text_to_sequence(text):
@@ -113,7 +101,7 @@ def make_batches(texts, mels, mags, batch_size):
 
     return text_batches, mel_batches, mag_batches
 
-def load_data(dir_str, batch_size=32):
+def load_data(dir_str, batch_size=CONFIG.batch_size):
     texts = load_texts(dir_str)
     mels, mags = load_sounds(dir_str)
     text_batches, mel_batches, mag_batches = make_batches(texts, mels, mags, batch_size)
@@ -126,6 +114,8 @@ def generate_batch(train_batches, mel_batches, mag_batches):
         yield (train_batches[i], mel_batches[i], mag_batches[i])
 
 if __name__ == "__main__":
-    for elem in load_data('./train')[2]:
-        print("boop")
-        print(elem)
+    train_feature_batches, train_mel_batches, train_mag_batches = load_data('./train', batch_size=1)
+    generate_batch = generate_batch(train_feature_batches, train_mel_batches, train_mag_batches)
+    for batch in generate_batch:
+        for item in batch:
+            print(item)

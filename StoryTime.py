@@ -29,10 +29,10 @@ class StorytimeArchitecture:
         self.model_output_mag = self.path
 
     def placeholders(self):
-        self.inputs_placeholder = K.placeholder(shape=(None, None, 256))
+        self.inputs_placeholder = K.placeholder(shape=(None, None, CONFIG.embed_size))
         # targets placeholder shape undecided, dependent on target label representation
-        self.mel_targets_placeholder = K.placeholder(shape=(None, None, None))
-        self.mag_targets_placeholder = K.placeholder(shape=(None, None, None))
+        self.mel_targets_placeholder = K.placeholder(shape=(None, None, CONFIG.audio_mel_banks))
+        self.mag_targets_placeholder = K.placeholder(shape=(None, None, 1 + (CONFIG.audio_fourier_transform_quantity // 2)))
 
     def feed_dict(self, inputs_batch, mel_targets_batch, mag_targets_batch, is_training=False):
         feed_dict = {}
@@ -74,9 +74,7 @@ if __name__ == "__main__":
             for features, mel_targets, mag_targets in generate_batch:
                 feed_dict = architecture.feed_dict(features, mel_targets, mag_targets, is_training=True)
                 #optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
-                _, loss = sess.run([optimizer, loss], feed_dict=feed_dict)
+                _, loss = sess.run([optimizer, total_loss], feed_dict=feed_dict)
             # Save model
             saver.save(sess, args.save_to_file, global_step=i)
-
-            print("Epoch %s finished with loss %.2f" % (i, loss))
-
+            print("Epoch %s finished with train loss %.2f" % (i, loss))
