@@ -26,9 +26,9 @@ class StorytimeArchitecture:
         # Decoder
         #TODO: determine what inputs to pass to decoder
         N,T,_ = self.memory.get_shape()
-        #go_frame = tf.zeros(self.inputs_placeholder, dtype=tf.int32)    #0 filled tensor
-        self.model_output_mel = components.seq_decoder(self.inputs_placeholder, self.memory)
-        #self.model_output_mel = self
+        self.go_frame = tf.zeros(shape=tf.shape(self.mel_targets_placeholder))    #0 filled tensor
+        self.model_output_mel = components.seq_decoder(self.go_frame, self.memory)
+
         self.path = components.decoder_cbhg(self.model_output_mel)
 
         # Magnitude output
@@ -82,5 +82,5 @@ if __name__ == "__main__":
                 #optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
                 _, loss = sess.run([optimizer, total_loss], feed_dict=feed_dict)
             # Save model
-            saver.save(sess, args.save_to_file, global_step=i)
+            saver.save(sess, args.save_model_file, global_step=i)
             print("Epoch %s finished with train loss %.2f" % (i, loss))

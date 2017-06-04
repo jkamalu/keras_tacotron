@@ -13,35 +13,33 @@ from config import CONFIG
 #        return embedding
 
 def seq_decoder(inputs, memory, scope="decoder1", reuse=None):
-
-
     #going off the assumption that we have to run the decoder for r number of steps, feeding the r frames every time
-    for i in range(0, CONFIG.reduction_factor):
-        with tf.variable_scope(scope, reuse=reuse):
-            prenet_inputs = prenet(inputs)
 
-            reuse = True if i > 0 else None
-            print("I am running it %i" % i)
-            if i > 0:
-                dec = attention(prenet_inputs, memory, reuse=True)
-            else:
-                dec = attention(prenet_inputs, memory, reuse=None)
+    #for i in range(0, CONFIG.reduction_factor):
+    with tf.variable_scope(scope, reuse=reuse):
+        prenet_inputs = prenet(inputs)
 
-            #By maintaining the tf variable scope within the two layers it should allow for weights to be passed horizontally
-            #Else we might need to implement our own GRU or use a pure TF one
-            with tf.variable_scope("decoder_rnn1"):
-                #just uses attention as input rather than residual, which seems more faithful to the paper than other
-                #implementations, old form is:
-                    #dec = Add()([dec, GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)])
-                dec = GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)
-                dec = Add()([dec, GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)])
+        dec = attention(prenet_inputs, memory, reuse=True)
 
-            #otputs = Dense(out_dim)(dec)
-            inputs = dec
+        #By maintaining the tf variable scope within the two layers it should allow for weights to be passed horizontally
+        #Else we might need to implement our own GRU or use a pure TF one
+        with tf.variable_scope("decoder_rnn1"):
+            #just uses attention as input rather than residual, which seems more faithful to the paper than other
+            #implementations, old form is:
+                #dec = Add()([dec, GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)])
+            dec = GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)
+            dec = Add()([dec, GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)])
+
+        #otputs = Dense(out_dim)(dec)
+        inputs = dec
+
     #we need to capture reduction_factor frames with mel_bank features each, hence the multiplied dimensionality
     out_dim = CONFIG.audio_mel_banks*CONFIG.reduction_factor
     outputs = Dense(out_dim)(inputs)
-    return outputs
+    #_, output = tf.split(outputs, [out_dim-CONFIG.audio_mel_banks, CONFIG.audio_mel_banks], axis=-1)
+    outputs = tf.split(outputs, num_or_size_splits=5, axis=2)
+    #print(outputs)
+    return outputs[-1]
 
 def decoder_cbhg(inputs, residual_input=None):
     with tf.name_scope('decoder_cbhg'):
@@ -49,10 +47,11 @@ def decoder_cbhg(inputs, residual_input=None):
         convolutions = convolutional_bank(inputs, True)
         # max pooling
         max_pooling = MaxPooling1D(pool_size=2, strides=1, padding='same')(convolutions)
+
         # convolutional projections
         projection = Conv1D(CONFIG.embed_size, 3, padding='same', activation='relu')(max_pooling)
         norm = BatchNormalization()(projection)
-        projection = Conv1D(80, 3, padding='same', activation='linear')(norm)
+        projection = Conv1D(CONFIG.embed_size//2, 3, padding='same', activation='linear')(norm)
         norm = BatchNormalization()(projection)
 
         #residual connections
@@ -60,17 +59,23 @@ def decoder_cbhg(inputs, residual_input=None):
             residual = Add()([norm, residual_input])
         else:
             residual = norm
-        #res_shape = residual.get_shape()
-        #print("residual shape is %s" % res_shape)
-        #residual = Reshape((-1, 128), input_shape=tf.shape(residual)[0])(residual)
-        residual = tf.reshape(residual, shape=[tf.shape(residual)[0], -1, 128])
+
+    #if we want to have 80-dim conv converted to 128 instead of a 128 conv with no conversion (current)
+        #projection = Conv1D(CONFIG.audio_mel_banks, 3, padding='same', activation='linear')(norm)
+        #res_dim = CONFIG.embed_size//2
+        #residual = Dense(res_dim)(residual)
+
         # highway network
         highway = highway_network(residual, num_layers=4)
+
         # bidirectional gru
         bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True, implementation=CONFIG.gru_implementation))(highway)
-        return bidirectional_gru
 
-def attention(inputs, memory, num_units=256, variable_scope="attention_decoder", reuse=None):
+        out_dim = (1 + CONFIG.audio_fourier_transform_quantity//2)
+        outputs = Dense(out_dim)(bidirectional_gru)
+        return outputs
+
+def attention(inputs, memory, num_units=CONFIG.embed_size, variable_scope="attention_decoder", reuse=None):
     # Tensorflow underlying code to support Bahdanau attention
     # Returns a tensorflow
     def attend(input_mem):
