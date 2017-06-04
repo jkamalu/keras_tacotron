@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import numpy as np
 import tensorflow as tf
@@ -75,7 +76,10 @@ if __name__ == "__main__":
 
     with sess.as_default():
         #Train model
-        for i in range(CONFIG.num_epochs):
+        #for i in range(CONFIG.num_epochs):
+        i = 0
+        while not os.path.isfile("stop_train"):
+            i += 1
             generate_batch = data.generate_batch(train_feature_batches, train_mel_batches, train_mag_batches)
             for features, mel_targets, mag_targets in generate_batch:
                 feed_dict = architecture.feed_dict(features, mel_targets, mag_targets, is_training=True)
