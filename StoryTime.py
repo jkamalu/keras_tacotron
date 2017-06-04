@@ -49,8 +49,8 @@ if __name__ == "__main__":
     parser.add_argument('--save_model_file', nargs='?', default='./saved_model', type=str)
     args = parser.parse_args()
 
-    train_features, train_targets = data.load_data(args.train_path)
-    eval_features, eval_targets = data.load_data(args.eval_path)
+    train_feature_batches, train_target_batches = data.load_data(args.train_path, batch_size=CONFIG.batch_size)
+    eval_feature_batches, eval_target_batches = data.load_data(args.eval_path)
 
     # Build graph
     architecture = StorytimeArchitecture()
@@ -69,14 +69,12 @@ if __name__ == "__main__":
     with sess.as_default():
         #Train model
         for i in range(CONFIG.num_epochs):
-            np.random.shuffle(train_features)
-            np.random.shuffle(train_targets)
-            generate_batch = data.generate_batch(train_features, train_targets, CONFIG.batch_size)
+            generate_batch = data.generate_batch(train_feature_batches, train_target_batches)
             while True:
                 batch = next(generate_batch)
                 if batch is None: break
-                feat, target = batch
-                optimizer.run(feed_dict=architecture.feed_dict(feat, target, is_training=True))
+                features, targets = batch
+                optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
             # Save model
             saver.save(sess, args.save_to_file, global_step=i)
 
