@@ -1,4 +1,6 @@
 import numpy as np
+import librosa
+import re
 from keras.preprocessing.text import one_hot
 from config import CONFIG
 
@@ -14,29 +16,72 @@ from config import CONFIG
 #     dummy_train_data.append(train_batch.tolist())
 #     dummy_target_data.append(target_batch.tolist())
 
-# input  -> dataset directory
-# output -> (padded character sequences, spectrogram targets) pair of numpy ndarrays
-def load_data(directory):
-	# padding example
-	# keras.preprocessing.sequence.pad_sequences(char_seq, padding='post', value=0)
-	return (None, None)
-
 # input -> raw text string
-# output -> a numpy matrix of (256, characters)
+# output -> a numpy matrix of (seqlens, 256)
 def text_to_sequence(text):
 	# split text into a list by character
 	# returns the index (row) of where they should appear
 	hot_indexes = one_hot(' '.join(list(text)), CONFIG.embed_size, lower=False)
 
 	# placeholder matrix
-	matrix = np.zeros(shape=(CONFIG.embed_size, len(hot_indexes)))
+	matrix = np.zeros(shape=(len(hot_indexes), CONFIG.embed_size))
 
 	# go through and set the indicated indices "hot" in the create dmatrix
 	for i, val in enumerate(hot_indexes):
-		matrix[val,i] = 1
+		matrix[i, val] = 1
 
 	return matrix
 
+def load_texts(dir_str):
+	i = 0
+	texts = []
+	while True:
+		file_path = "%s/text/%s.txt" % (dir_str, sub_dir_str, i)
+		try:
+			file = open(file_path)
+			text = file.read()
+		except IOError as err: break
+		text = re.sub(r'[^A-z]+', ' ', text)
+		texts.append(text_to_sequence(text))
+		i += 1
+	return texts
+
+def load_sounds(dir_str):
+
+def make_batches(texts, sounds, batch_size):
+	num_samples = len(texts)
+
+	text_batches = [] 
+	sound_batches = []
+
+	l_index = 0
+	r_index = batch_size
+
+	while l_index <= num_samples:
+		batch_texts = texts[l_index:r_index]
+		batch_texts_padded = []
+		batch_texts_max_len = 0
+
+		for matrix in batch_texts:
+			if matrix.shape[0] > batch_texts_max_len:
+				batch_texts_max_len = matrix.shape[0]
+
+		for matrix in batch_texts:
+			padding = np.zeros(shape=(batch_texts_max_len - matrix.shape[0], 256))
+			padded_matrix = np.append(matrix, padding, axis=0)
+			batch_texts_padded.append(padded_matrix)
+
+		text_batches.append()
+
+	return text_batches, sound_batches
+
+def load_data(dir_str, batch_size=None):
+	texts = load_texts(dir_str)
+	sounds = load_sounds(dir_str):
+	return make_batches(texts, sounds, batch_size)
+
+# padding must be done here
+# keras.preprocessing.sequence.pad_sequences(char_seq, padding='post', value=0)
 def generate_batch(train, target, batch_size):
 	assert train.shape[0] == target.shape[0]
 	l_index = 0
