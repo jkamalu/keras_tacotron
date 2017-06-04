@@ -73,20 +73,15 @@ if __name__ == "__main__":
             while True:
                 batch = next(generate_batch)
                 if batch is None: break
-<<<<<<< HEAD
-                feat, target = batch
-                feed_dict = architecture.feed_dict(feat, target, is_training=True)
-                #optimizer.run(feed_dict=architecture.feed_dict(feat, target, is_training=True))
-                _, loss = sess.run([optimizer, loss], feed_dict=feed_dict)
-            print("Epoch %s finished with loss %.2f" % (i, loss))
-=======
+
                 features, targets = batch
-                optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
+                feed_dict = architecture.feed_dict(features, targets, is_training=True)
+                #optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
+                _, loss = sess.run([optimizer, loss], feed_dict=feed_dict)
             # Save model
             saver.save(sess, args.save_to_file, global_step=i)
->>>>>>> e82a20eebf28159a0180330dccf40ed95fbb3b06
 
-            print("Epoch %s finished" % i)
+            print("Epoch %s finished with loss %.2f" % (i, loss))
 
         # Test model
         evaluation = acc_value.eval(feed_dict=architecture.feed_dict(eval_features, eval_targets))
