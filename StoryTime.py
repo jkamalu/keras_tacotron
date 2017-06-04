@@ -71,11 +71,13 @@ if __name__ == "__main__":
         for i in range(CONFIG.num_epochs):
             generate_batch = data.generate_batch(train_feature_batches, train_target_batches)
             for features, targets in generate_batch:
-                optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
+                feed_dict = architecture.feed_dict(features, targets, is_training=True)
+                #optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
+                _, loss = sess.run([optimizer, loss], feed_dict=feed_dict)
             # Save model
             saver.save(sess, args.save_to_file, global_step=i)
 
-            print("Epoch %s finished" % i)
+            print("Epoch %s finished with loss %.2f" % (i, loss))
 
         # Test model
         evaluation = acc_value.eval(feed_dict=architecture.feed_dict(eval_features, eval_targets))
