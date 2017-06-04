@@ -69,7 +69,7 @@ def make_batch(batch_items, axis_one_dim):
 def make_batches(texts, mels, mags, batch_size):
     num_samples = len(texts)
 
-    text_batches = [] 
+    text_batches = []
     mel_batches = []
     mag_batches = []
 
@@ -91,7 +91,7 @@ def make_batches(texts, mels, mags, batch_size):
 
         batch_mags = mags[l_index:r_index]
         batch_mags_padded = make_batch(batch_mags, 1 + (CONFIG.audio_fourier_transform_quantity // 2))
-        mag_batches.append(batch_mags_padded)       
+        mag_batches.append(batch_mags_padded)
 
         l_index = r_index
         if (r_index + batch_size) < num_samples:
