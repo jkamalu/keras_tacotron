@@ -37,12 +37,14 @@ class StorytimeArchitecture:
     def placeholders(self):
         self.inputs_placeholder = K.placeholder(shape=(None, None, 256))
         # targets placeholder shape undecided, dependent on target label representation
-        self.targets_placeholder = K.placeholder(shape=(None, None, None))
+        self.mel_targets_placeholder = K.placeholder(shape=(None, None, None))
+        self.mag_targets_placeholder = K.placeholder(shape=(None, None, None))
 
-    def feed_dict(self, inputs_batch, targets_batch, is_training=False):
+    def feed_dict(self, inputs_batch, mel_targets_batch, mag_targets_batch, is_training=False):
         feed_dict = {}
         feed_dict[self.inputs_placeholder] = inputs_batch
-        feed_dict[self.targets_placeholder] = targets_batch
+        feed_dict[self.mel_targets_placeholder] = mel_targets_batch
+        feed_dict[self.mag_targets_placeholder] = mag_targets_batch
         feed_dict[K.learning_phase()] = 1 if is_training else 0
         return feed_dict
 
@@ -53,8 +55,8 @@ if __name__ == "__main__":
     parser.add_argument('--save_model_file', nargs='?', default='./saved_model', type=str)
     args = parser.parse_args()
 
-    train_feature_batches, train_target_batches = data.load_data(args.train_path, batch_size=CONFIG.batch_size)
-    eval_feature_batches, eval_target_batches = data.load_data(args.eval_path)
+    train_feature_batches, train_mel_batches, train_mag_batches = data.load_data(args.train_path)
+    # eval_feature_batches, eval_target_batches = data.load_data(args.eval_path)
 
     # Build graph
     architecture = StorytimeArchitecture()
@@ -62,11 +64,10 @@ if __name__ == "__main__":
     sess = tf.Session()
     K.set_session(sess)
 
-    mel_loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.targets_placeholder, architecture.model_output_mel))
-    mag_loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.targets_placeholder, architecture.model_output_mag))
+    mel_loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.mel_targets_placeholder, architecture.model_output_mel))
+    mag_loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.mag_targets_placeholder, architecture.model_output_mag))
     total_loss = mel_loss + mag_loss
     optimizer = tf.train.AdamOptimizer(CONFIG.learning_rate).minimize(total_loss)
-    acc_value = categorical_accuracy(architecture.targets_placeholder, architecture.model_output)
 
     init_op = tf.global_variables_initializer()
     saver = tf.train.Saver(tf.trainable_variables())
@@ -75,9 +76,9 @@ if __name__ == "__main__":
     with sess.as_default():
         #Train model
         for i in range(CONFIG.num_epochs):
-            generate_batch = data.generate_batch(train_feature_batches, train_target_batches)
-            for features, targets in generate_batch:
-                feed_dict = architecture.feed_dict(features, targets, is_training=True)
+            generate_batch = data.generate_batch(train_feature_batches, train_mel_batches, train_mag_batches)
+            for features, mel_targets, mag_targets in generate_batch:
+                feed_dict = architecture.feed_dict(features, mel_targets, mag_targets, is_training=True)
                 #optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
                 _, loss = sess.run([optimizer, loss], feed_dict=feed_dict)
             # Save model
@@ -85,5 +86,3 @@ if __name__ == "__main__":
 
             print("Epoch %s finished with loss %.2f" % (i, loss))
 
-        # Test model
-        evaluation = acc_value.eval(feed_dict=architecture.feed_dict(eval_features, eval_targets))
