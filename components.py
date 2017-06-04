@@ -52,7 +52,7 @@ def decoder_cbhg(inputs, residual_input=None):
         # convolutional projections
         projection = Conv1D(CONFIG.embed_size, 3, padding='same', activation='relu')(max_pooling)
         norm = BatchNormalization()(projection)
-        projection = Conv1D(CONFIG.audio_mel_banks, 3, padding='same', activation='linear')(norm)
+        projection = Conv1D(80, 3, padding='same', activation='linear')(norm)
         norm = BatchNormalization()(projection)
 
         #residual connections
@@ -60,10 +60,10 @@ def decoder_cbhg(inputs, residual_input=None):
             residual = Add()([norm, residual_input])
         else:
             residual = norm
-        res_shape = residual.get_shape()
-        print("residual shape is %s" % res_shape)
-        print("the desired shape is %s" % ([res_shape[0], res_shape[1], 128]))
-        residual = Reshape([res_shape[0], res_shape[1], 128], input_shape=res_shape)(residual)
+        #res_shape = residual.get_shape()
+        #print("residual shape is %s" % res_shape)
+        #residual = Reshape((-1, 128), input_shape=tf.shape(residual)[0])(residual)
+        residual = tf.reshape(residual, shape=[tf.shape(residual)[0], -1, 128])
         # highway network
         highway = highway_network(residual, num_layers=4)
         # bidirectional gru

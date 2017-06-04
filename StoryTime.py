@@ -29,7 +29,7 @@ class StorytimeArchitecture:
         #go_frame = tf.zeros(self.inputs_placeholder, dtype=tf.int32)    #0 filled tensor
         self.model_output_mel = components.seq_decoder(self.inputs_placeholder, self.memory)
         #self.model_output_mel = self
-        self.path = components.decoder_cbhg(self.path)
+        self.path = components.decoder_cbhg(self.model_output_mel)
 
         # Magnitude output
         self.model_output_mag = self.path
@@ -80,7 +80,7 @@ if __name__ == "__main__":
             for features, mel_targets, mag_targets in generate_batch:
                 feed_dict = architecture.feed_dict(features, mel_targets, mag_targets, is_training=True)
                 #optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
-                _, loss = sess.run([optimizer, loss], feed_dict=feed_dict)
+                _, total_loss = sess.run([optimizer, total_loss], feed_dict=feed_dict)
             # Save model
             saver.save(sess, args.save_to_file, global_step=i)
 
