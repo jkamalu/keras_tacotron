@@ -76,8 +76,10 @@ if __name__ == "__main__":
                 batch = next(generate_batch)
                 if batch is None: break
                 feat, target = batch
-                optimizer.run(feed_dict=architecture.feed_dict(feat, target, is_training=True))
-            print("Epoch %s finished" % i)
+                feed_dict = architecture.feed_dict(feat, target, is_training=True)
+                #optimizer.run(feed_dict=architecture.feed_dict(feat, target, is_training=True))
+                _, loss = sess.run([optimizer, loss], feed_dict=feed_dict)
+            print("Epoch %s finished with loss %.2f" % (i, loss))
 
         # Save model
         saver.save(sess, args.save_to_file)
