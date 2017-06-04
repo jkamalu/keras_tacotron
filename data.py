@@ -47,6 +47,7 @@ def load_texts(dir_str):
 	return texts
 
 def load_sounds(dir_str):
+	pass
 
 def make_batches(texts, sounds, batch_size):
 	num_samples = len(texts)
@@ -55,23 +56,30 @@ def make_batches(texts, sounds, batch_size):
 	sound_batches = []
 
 	l_index = 0
-	r_index = batch_size
+	r_index = batch_size if batch_size else num_samples
 
-	while l_index <= num_samples:
-		batch_texts = texts[l_index:r_index]
+	# make batch to append to batch lists
+	while l_index < num_samples:
+		batch_texts = texts[l_index:r_index] if r_index < num_samples else texts[l_index:num_samples]
 		batch_texts_padded = []
-		batch_texts_max_len = 0
 
+		# Get max seq len for text batch
+		batch_texts_max_len = 0
 		for matrix in batch_texts:
 			if matrix.shape[0] > batch_texts_max_len:
 				batch_texts_max_len = matrix.shape[0]
 
+		# Pad text sequences and create 3d numpy array
 		for matrix in batch_texts:
 			padding = np.zeros(shape=(batch_texts_max_len - matrix.shape[0], 256))
 			padded_matrix = np.append(matrix, padding, axis=0)
 			batch_texts_padded.append(padded_matrix)
 
-		text_batches.append()
+		# Append text batch to text batch list
+		text_batches.append(np.array(batch_texts_padded))
+
+		l_index = r_index
+		r_index = r_index + batch_size
 
 	return text_batches, sound_batches
 
@@ -80,14 +88,11 @@ def load_data(dir_str, batch_size=None):
 	sounds = load_sounds(dir_str):
 	return make_batches(texts, sounds, batch_size)
 
-# padding must be done here
-# keras.preprocessing.sequence.pad_sequences(char_seq, padding='post', value=0)
-def generate_batch(train, target, batch_size):
-	assert train.shape[0] == target.shape[0]
-	l_index = 0
-	r_index = batch_size
-	while l_index <= train.shape[0]:
-		yield (train[l_index:r_index], target[l_index:r_index])
-		l_index = r_index
-		r_index += batch_size
-	yield None
+def generate_batch(train_batches, target_batches):
+	assert len(train_batches) == len(target_batches)
+	for i in range(len(train_batches)):
+		yield (train_batches[i], target_batches[i])
+
+
+
+

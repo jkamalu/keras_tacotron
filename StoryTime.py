@@ -16,16 +16,20 @@ import data
 class StorytimeArchitecture:
 
     def __init__(self):
+        # Placeholders
         self.placeholders()
-        self.model_input()
-        #self.path = components.encoder_embedding(self.model_input)
+        # Model input
+        self.model_input = self.inputs_placeholder
+        # Encoder
         self.path = components.prenet(self.model_input)
         self.path = components.encoder_cbhg(self.path, self.path)
-        print("encoder_output: %s" % self.path.get_shape())
-        self.model_output()
+        # Decoder
+
+        # Magnitude output
+        self.model_output_mag = self.path
 
     def placeholders(self):
-        self.inputs_placeholder = K.placeholder(shape=(None, None))
+        self.inputs_placeholder = K.placeholder(shape=(None, None, 256))
         # targets placeholder shape undecided, dependent on target label representation
         self.targets_placeholder = K.placeholder(shape=(None, None, None))
 
@@ -35,12 +39,6 @@ class StorytimeArchitecture:
         feed_dict[self.targets_placeholder] = targets_batch
         feed_dict[K.learning_phase()] = 1 if is_training else 0
         return feed_dict
-
-    def model_input(self):
-        self.model_input = self.inputs_placeholder
-
-    def model_output(self):
-        self.model_output = self.path
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -58,8 +56,10 @@ if __name__ == "__main__":
     sess = tf.Session()
     K.set_session(sess)
 
-    loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.targets_placeholder, architecture.model_output))
-    optimizer = tf.train.AdamOptimizer(CONFIG.learning_rate).minimize(loss)
+    mel_loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.targets_placeholder, architecture.model_output_mel))
+    mag_loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.targets_placeholder, architecture.model_output_mag))
+    total_loss = mel_loss + mag_loss
+    optimizer = tf.train.AdamOptimizer(CONFIG.learning_rate).minimize(total_loss)
     acc_value = categorical_accuracy(architecture.targets_placeholder, architecture.model_output)
 
     init_op = tf.global_variables_initializer()
@@ -70,10 +70,7 @@ if __name__ == "__main__":
         #Train model
         for i in range(CONFIG.num_epochs):
             generate_batch = data.generate_batch(train_feature_batches, train_target_batches)
-            while True:
-                batch = next(generate_batch)
-                if batch is None: break
-                features, targets = batch
+            for features, targets in generate_batch:
                 optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
             # Save model
             saver.save(sess, args.save_to_file, global_step=i)
