@@ -18,8 +18,8 @@ def get_spectrograms(sound_file):
     y, sr = librosa.load(sound_file, sr=None) # or set sr to hp.sr.
 
     if sr != config.audio_sample_rate:
-        print "Sample rates should be the same (%d vs %d)" % (sr, config.audio_sample_rate)
-        print "Adjusting now..."
+        # print("Sample rates should be the same (%d vs %d)" % (sr, config.audio_sample_rate))
+        # print("Adjusting now...")
         y = librosa.core.resample(y, sr, config.audio_sample_rate)
         sr = config.audio_sample_rate
 
