@@ -96,7 +96,7 @@ if __name__ == "__main__":
                 # to get that value back
                 if args.generate_sample_every != 0 and i % args.generate_sample_every == 0:
                     print "Generating audio..."
-                    wavfile.write("output_iter_%d.wav" % (i), \
+                    wavfile.write("./output/output_iter_%d.wav" % (i), \
                                         CONFIG.audio_sample_rate, \
                                         audio.spectrogram2wav(mag))
 
