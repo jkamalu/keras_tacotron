@@ -1,4 +1,5 @@
-notes.txt
+test.txt
 *.pyc
+*.wav
 checkpoint
-saved_model*
+models*
