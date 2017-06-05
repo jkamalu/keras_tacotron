@@ -21,22 +21,21 @@ class StorytimeArchitecture:
     def __init__(self):
         # Placeholders
         self.placeholders()
+
         # Model input
         self.model_input = self.inputs_placeholder
+
         # Encoder
-        self.path = components.prenet(self.model_input)
-        self.memory = components.encoder_cbhg(self.path, self.path)
+        self.encoder_output = components.encoder(self.model_input)
+
         # Decoder
-        # TODO: determine what inputs to pass to decoder
-        N,T,_ = self.memory.get_shape()
-        # TODO:   ethson this cannot be based on mel_Targets... do we need go in predict????   
-        self.go_frame = tf.zeros(shape=tf.shape(self.mel_targets_placeholder))    #0 filled tensor
+        self.go_frame = tf.zeros(shape=tf.shape(self.mel_targets_placeholder))
+
+        # Mel spectrogram output
         self.model_output_mel = components.seq_decoder(self.go_frame, self.memory)
 
-        self.path = components.decoder_cbhg(self.model_output_mel)
-
-        # Magnitude output
-        self.model_output_mag = self.path
+        # Magnitude spectrogram output
+        self.model_output_mag = components.decoder_cbhg(self.model_output_mel)
 
     def placeholders(self):
         self.inputs_placeholder = K.placeholder(shape=(None, None, CONFIG.embed_size))
@@ -95,7 +94,7 @@ if __name__ == "__main__":
                 # This only makes sense if we are training on one example, so we can expect
                 # to get that value back
                 if args.generate_sample_every != 0 and i % args.generate_sample_every == 0:
-                    print "Generating audio..."
+                    print("Generating audio...")
                     wavfile.write("./output/output_iter_%d.wav" % (i), \
                                         CONFIG.audio_sample_rate, \
                                         audio.spectrogram2wav(mag))
