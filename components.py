@@ -36,14 +36,41 @@ def seq_decoder(inputs, memory, scope="decoder1", reuse=None):
     #print(outputs)
     return outputs[-1]
 
+# decoder input is mel targets placeholder, enccoder output is memory
 def decoder(inputs, memory):
-
+    # num_layers = inputs.get_shape()[1].value // CONFIG.reduction_factor
+    num_layers = CONFIG.max_seq_length // CONFIG.reduction_factor
+    all_frames = tf.split(inputs, CONFIG.max_seq_length, 1)
+    # all_frames = tf.slice(inputs, [0, 0, 0], [-1, 1, CONFIG.audio_mel_banks])
+    frames = [all_frames[i] for i in range(len(all_frames)) if (i % CONFIG.reduction_factor) == 0]
+    mel_sections = []
+    for i in range(len(frames)):
+        prenet_output = prenet(frames[i])
+        attention_output = attention(prenet_output, memory)
+        # TODO: clarify residual usage
+        # TODO: look into concatenation context and attention output
+        decoder_step = GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(attention_output)
+        decoder_step = Add()([attention_output, decoder_step])
+        decoder_step = GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(decoder_step)
+        decoder_step = Add()([attention_output, decoder_step])
+        print("1: %s" % decoder_step)
+        mel_section = Dense(CONFIG.reduction_factor * CONFIG.audio_mel_banks)(decoder_step)
+        print(mel_section)
+        #mel_section = Reshape((CONFIG.reduction_factor, CONFIG.audio_mel_banks))(mel_section)
+        mel_section = tf.reshape(mel_section, [-1,5,80])
+        print(mel_section)
+        mel_sections.append(mel_section)
+    print("ou")
+    print(mel_section)    
+    mel_output = Concatenate(axis=1)(mel_sections)
+    print(mel_output)
+    mag_output = decoder_cbhg(mel_output, mel_output)
     return (mel_output, mag_output)
 
 def decoder_cbhg(inputs, residual_input=None):
     with tf.name_scope('decoder_cbhg'):
         # convolutional bank
-        convolutions = convolutional_bank(inputs, True)
+        convolutions = convolutional_bank(inputs, decoding=True)
         # max pooling
         max_pooling = MaxPooling1D(pool_size=2, strides=1, padding='same')(convolutions)
         # convolutional projections
@@ -66,11 +93,9 @@ def decoder_cbhg(inputs, residual_input=None):
         mag_spectrogram = Dense(1 + CONFIG.audio_fourier_transform_quantity // 2)(bidirectional_gru)
         return mag_spectrogram
 
-# TODO: what is reuse meant for ?
-# TODO: why the except clause
 # TODO: paper mentions stateful recurrent layer to produce attention query @ each timestep
 # Bahdanau attention from tf.contrib.seq2seq
-def attention(inputs, memory, num_units=CONFIG.embed_size, variable_scope="attention_decoder", reuse=None):
+def attention(inputs, memory, num_units=CONFIG.embed_size, variable_scope="attention_decoder"):
     
     def attend(input_and_memory):
         inputs, memory = input_and_memory
@@ -104,7 +129,7 @@ def prenet(inputs):
 
 def convolutional_bank(inputs, decoding=False):
     convolutions = Conv1D(CONFIG.embed_size // 2, 1, padding='same')(inputs)
-    k_width = CONFIG.num_conv_regions if decoding == False else CONFIG.num_conv_regions//2
+    k_width = CONFIG.num_conv_regions if not decoding else CONFIG.num_conv_regions // 2
     for i in range(2, k_width + 1):
         conv = Conv1D(CONFIG.embed_size // 2, i, padding='same')(inputs)
         norm = BatchNormalization()(conv)

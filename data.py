@@ -49,14 +49,19 @@ def load_sounds(dir_str):
         i += 1
     return mels, mags
 
-def make_batch(batch_items, axis_one_dim):
+def make_batch(batch_items, axis_one_dim, mel_type=False):
     batch_items_padded = []
 
     # Get max seq len for text batch
-    batch_items_max_len = 0
+    batch_items_max_len = 0 
     for matrix in batch_items:
         if matrix.shape[0] > batch_items_max_len:
             batch_items_max_len = matrix.shape[0]
+
+    if mel_type:
+        assert matrix.shape[0] < CONFIG.max_seq_length
+        print(matrix.shape[0])
+        batch_items_max_len = CONFIG.max_seq_length
 
     # Pad text sequences and create 3d numpy array
     for matrix in batch_items:
@@ -86,7 +91,7 @@ def make_batches(texts, mels, mags, batch_size):
         text_batches.append(batch_texts_padded)
 
         batch_mels = mels[l_index:r_index]
-        batch_mels_padded = make_batch(batch_mels, CONFIG.audio_mel_banks)
+        batch_mels_padded = make_batch(batch_mels, CONFIG.audio_mel_banks, mel_type=True)
         mel_batches.append(batch_mels_padded)
 
         batch_mags = mags[l_index:r_index]

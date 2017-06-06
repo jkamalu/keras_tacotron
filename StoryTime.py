@@ -29,14 +29,13 @@ class StorytimeArchitecture:
         self.encoder_output = components.encoder(self.model_input)
 
         # Decoder
-        self.go_frame = tf.zeros(shape=tf.shape(self.mel_targets_placeholder))
-
-        # Mel/Mag spectrogram output
-        self.model_output_mel, self.model_output_mag = components.decoder(self.go_frame, self.encoder_output)
+        go_frame = tf.zeros(shape=tf.shape(self.mel_targets_placeholder))
+        
+        decoder_input = K.in_train_phase(self.mel_targets_placeholder, go_frame)
+        self.model_output_mel, self.model_output_mag = components.decoder(decoder_input, self.encoder_output)
 
     def placeholders(self):
         self.inputs_placeholder = K.placeholder(shape=(None, None, CONFIG.embed_size))
-        # targets placeholder shape undecided, dependent on target label representation
         self.mel_targets_placeholder = K.placeholder(shape=(None, None, CONFIG.audio_mel_banks))
         self.mag_targets_placeholder = K.placeholder(shape=(None, None, 1 + (CONFIG.audio_fourier_transform_quantity // 2)))
 
