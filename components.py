@@ -1,69 +1,84 @@
 import tensorflow as tf
 from keras import backend as K
 
-from keras.layers import Dense, Dropout, Conv1D, BatchNormalization, MaxPooling1D, GRU, Bidirectional, Lambda, Reshape
+from keras.layers import Dense, Dropout, Conv1D, BatchNormalization, MaxPooling1D, Bidirectional, Lambda, Reshape, GRU
 from keras.layers.merge import Add, Multiply, Concatenate
 from keras.initializers import Constant
 
 from config import CONFIG
 
-def seq_decoder(inputs, memory, scope="decoder1", reuse=None):
-    #going off the assumption that we have to run the decoder for r number of steps, feeding the r frames every time
-
-    #for i in range(0, CONFIG.reduction_factor):
-    with tf.variable_scope(scope, reuse=reuse):
-        prenet_inputs = prenet(inputs)
-
-        dec = attention(prenet_inputs, memory, reuse=True)
-
-        #By maintaining the tf variable scope within the two layers it should allow for weights to be passed horizontally
-        #Else we might need to implement our own GRU or use a pure TF one
-        with tf.variable_scope("decoder_rnn1"):
-            #just uses attention as input rather than residual, which seems more faithful to the paper than other
-            #implementations, old form is:
-                #dec = Add()([dec, GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)])
-            dec = GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)
-            dec = Add()([dec, GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(dec)])
-
-        #otputs = Dense(out_dim)(dec)
-        inputs = dec
-
-    #we need to capture reduction_factor frames with mel_bank features each, hence the multiplied dimensionality
-    out_dim = CONFIG.audio_mel_banks*CONFIG.reduction_factor
-    outputs = Dense(out_dim)(inputs)
-    #_, output = tf.split(outputs, [out_dim-CONFIG.audio_mel_banks, CONFIG.audio_mel_banks], axis=-1)
-    outputs = tf.split(outputs, num_or_size_splits=5, axis=2)
-    #print(outputs)
-    return outputs[-1]
-
-# decoder input is mel targets placeholder, enccoder output is memory
 def decoder(inputs, memory):
-    # num_layers = inputs.get_shape()[1].value // CONFIG.reduction_factor
-    num_layers = CONFIG.max_seq_length // CONFIG.reduction_factor
-    all_frames = tf.split(inputs, CONFIG.max_seq_length, 1)
-    # all_frames = tf.slice(inputs, [0, 0, 0], [-1, 1, CONFIG.audio_mel_banks])
-    frames = [all_frames[i] for i in range(len(all_frames)) if (i % CONFIG.reduction_factor) == 0]
-    mel_sections = []
-    for i in range(len(frames)):
-        prenet_output = prenet(frames[i])
-        attention_output = attention(prenet_output, memory)
-        # TODO: clarify residual usage
-        # TODO: look into concatenation context and attention output
-        decoder_step = GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(attention_output)
-        decoder_step = Add()([attention_output, decoder_step])
-        decoder_step = GRU(CONFIG.embed_size, return_sequences=True, implementation=CONFIG.gru_implementation)(decoder_step)
-        decoder_step = Add()([attention_output, decoder_step])
-        print("1: %s" % decoder_step)
-        mel_section = Dense(CONFIG.reduction_factor * CONFIG.audio_mel_banks)(decoder_step)
-        print(mel_section)
-        #mel_section = Reshape((CONFIG.reduction_factor, CONFIG.audio_mel_banks))(mel_section)
-        mel_section = tf.reshape(mel_section, [-1,5,80])
-        print(mel_section)
-        mel_sections.append(mel_section)
-    print("ou")
-    print(mel_section)    
-    mel_output = Concatenate(axis=1)(mel_sections)
-    print(mel_output)
+    """
+    TensorFlow compliant decoder based on MU94W's Tacotron repository.
+    See https://github.com/MU94W/Tacotron/blob/master/model.py for source.
+    """
+
+    total_steps = CONFIG.max_seq_length
+    num_layers = tf.div(total_steps, CONFIG.reduction_factor)
+    batch_size = tf.shape(inputs)[0]
+
+    # padding = tf.zeros(shape=(batch_size, CONFIG.max_seq_length - tf.shape(inputs)[1], CONFIG.audio_mel_banks))
+    # padded_inputs = Concatenate(axis=1)([inputs, padding])
+    # print("padded inputs: %s" % padded_inputs)
+
+    attention_cell = tf.contrib.rnn.GRUCell(CONFIG.embed_size)
+    with tf.variable_scope("attention_decoder"):
+        attention = tf.contrib.seq2seq.BahdanauAttention(CONFIG.embed_size, memory)
+    decoder_gru_1 = tf.contrib.rnn.GRUCell(CONFIG.embed_size)
+    decoder_gru_2 = tf.contrib.rnn.ResidualWrapper(tf.contrib.rnn.GRUCell(CONFIG.embed_size))
+
+    with tf.variable_scope("decoder_loop"):
+        attention_cell_state = attention_cell.zero_state(batch_size, dtype=tf.float32)
+        decoder_gru_1_state = decoder_gru_1.zero_state(batch_size, dtype=tf.float32)
+        decoder_gru_2_state = decoder_gru_2.zero_state(batch_size, dtype=tf.float32)
+        states = (attention_cell_state, decoder_gru_1_state, decoder_gru_2_state)
+
+        mel_sections = tf.TensorArray(size=total_steps, dtype=tf.float32)
+
+        step = tf.constant(0, dtype=tf.int32)
+        condition = lambda step, *vars : tf.less(step, num_layers)
+
+        def decoder_body(step, mel_sections, states):
+            l_step = step * CONFIG.reduction_factor
+            r_frame = tf.slice(inputs, [0, l_step, 0], [-1, 1, -1])
+            r_frame = tf.unstack(r_frame, axis=1)[0]
+
+            with tf.variable_scope('prenet'):
+                prenet_output = tf.layers.dense(r_frame, CONFIG.embed_size)
+                prenet_output = tf.nn.dropout(prenet_output, CONFIG.dropout)
+                prenet_output = tf.layers.dense(prenet_output, CONFIG.embed_size // 2)
+                prenet_output = tf.nn.dropout(prenet_output, CONFIG.dropout)
+
+            with tf.variable_scope("attention_cell"):
+                attention_cell_output, attention_cell_state = attention_cell(prenet_output, states[0])
+
+            with tf.variable_scope("attention_decoder") as scope:
+                context = attention(attention_cell_output)
+
+            with tf.variable_scope("decoder-cells"):
+                with tf.variable_scope("cell-1"):
+                    decoder_gru_1_output, decoder_gru_1_state = decoder_gru_1(attention_cell_output, states[1]) # context ???
+                    decoder_gru_1_res = Add()([tf.identity(attention_cell_output), decoder_gru_1_output])
+
+                with tf.variable_scope("cell-2"):
+                    decoder_gru_2_res, decoder_gru_2_state = decoder_gru_2(decoder_gru_1_res, states[2])
+
+            with tf.variable_scope("mel-frames"):
+                # mel_frame = Dense(CONFIG.audio_mel_banks)(decoder_gru_2_res)
+                mel_frame = tf.layers.dense(decoder_gru_2_res, CONFIG.audio_mel_banks)
+                print("mel frame: %s" % mel_frame)
+                for r_step in range(CONFIG.reduction_factor):
+                    mel_sections = mel_sections.write(l_step + r_step, mel_frame)
+
+            states = attention_cell_state, decoder_gru_1_state, decoder_gru_2_state
+            return tf.add(step, 1), mel_sections, states
+
+        __, mel_output, __ = tf.while_loop(condition, decoder_body, (step, mel_sections, states))
+        mel_output = mel_output.stack()
+        print("mel stack: %s" % mel_output)
+
+    mel_output = tf.reshape(mel_output, [batch_size, total_steps, CONFIG.audio_mel_banks])
+    print("mel reshape: %s" % mel_output)
     mag_output = decoder_cbhg(mel_output, mel_output)
     return (mel_output, mag_output)
 
@@ -93,28 +108,6 @@ def decoder_cbhg(inputs, residual_input=None):
         mag_spectrogram = Dense(1 + CONFIG.audio_fourier_transform_quantity // 2)(bidirectional_gru)
         return mag_spectrogram
 
-# TODO: paper mentions stateful recurrent layer to produce attention query @ each timestep
-# Bahdanau attention from tf.contrib.seq2seq
-def attention(inputs, memory, num_units=CONFIG.embed_size, variable_scope="attention_decoder"):
-    
-    def attend(input_and_memory):
-        inputs, memory = input_and_memory
-        with tf.variable_scope(variable_scope) as scope:
-            try:
-                v = tf.get_variable("v", [1])
-            except ValueError:
-                scope.reuse_variables()            
-            # Attention and RNN layers
-            cell = tf.contrib.rnn.GRUCell(num_units)
-            attention = tf.contrib.seq2seq.BahdanauAttention(num_units, memory)
-            # Attention and RNN wrapper
-            cell_with_attention = tf.contrib.seq2seq.DynamicAttentionWrapper(cell, attention, num_units)
-            outputs, state = tf.nn.dynamic_rnn(cell_with_attention, inputs, dtype=tf.float32)
-            return outputs
-
-    # Shape must equal [batches, timesteps, num_units]
-    return Lambda(attend)([inputs, memory])
-
 def encoder(inputs):
     prenet_output = prenet(inputs)
     encoder_output = encoder_cbhg(prenet_output, prenet_output)
@@ -122,9 +115,9 @@ def encoder(inputs):
 
 def prenet(inputs):
     prenet_output = Dense(CONFIG.embed_size, activation='relu')(inputs)
-    prenet_output = Dropout(0.5)(prenet_output)
+    prenet_output = Dropout(CONFIG.dropout)(prenet_output)
     prenet_output = Dense(CONFIG.embed_size // 2, activation='relu')(prenet_output)
-    prenet_output = Dropout(0.5)(prenet_output)
+    prenet_output = Dropout(CONFIG.dropout)(prenet_output)
     return prenet_output
 
 def convolutional_bank(inputs, decoding=False):

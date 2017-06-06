@@ -6,6 +6,7 @@ class CONFIG:
     max_seq_length = 500
 
     embed_size = 256
+    dropout = 0.5
 
     learning_rate = 0.001
 
