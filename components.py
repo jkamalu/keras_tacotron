@@ -36,41 +36,40 @@ def seq_decoder(inputs, memory, scope="decoder1", reuse=None):
     #print(outputs)
     return outputs[-1]
 
+def decoder(inputs, memory):
+
+    return (mel_output, mag_output)
+
 def decoder_cbhg(inputs, residual_input=None):
     with tf.name_scope('decoder_cbhg'):
         # convolutional bank
         convolutions = convolutional_bank(inputs, True)
         # max pooling
         max_pooling = MaxPooling1D(pool_size=2, strides=1, padding='same')(convolutions)
-
         # convolutional projections
         projection = Conv1D(CONFIG.embed_size, 3, padding='same', activation='relu')(max_pooling)
         norm = BatchNormalization()(projection)
-        projection = Conv1D(CONFIG.embed_size//2, 3, padding='same', activation='linear')(norm)
+        projection = Conv1D(CONFIG.audio_mel_banks, 3, padding='same', activation='linear')(norm)
         norm = BatchNormalization()(projection)
-
-        #residual connections
+        #residual connection
         if residual_input is not None:
             residual = Add()([norm, residual_input])
         else:
             residual = norm
-
-        #if we want to have 80-dim conv converted to 128 instead of a 128 conv with no conversion (current)
-        #projection = Conv1D(CONFIG.audio_mel_banks, 3, padding='same', activation='linear')(norm)
-        #res_dim = CONFIG.embed_size//2
-        #residual = Dense(res_dim)(residual)
-
+        # plain feed forward network
+        plain = plain_network(residual, num_layers=4)
         # highway network
-        highway = highway_network(residual, num_layers=4)
-
+        highway = highway_network(plain, num_layers=4)
         # bidirectional gru
         bidirectional_gru = Bidirectional(GRU(CONFIG.embed_size // 2, return_sequences=True, implementation=CONFIG.gru_implementation))(highway)
+        # linear magnitude spectrogram
+        mag_spectrogram = Dense(1 + CONFIG.audio_fourier_transform_quantity // 2)(bidirectional_gru)
+        return mag_spectrogram
 
-        out_dim = (1 + CONFIG.audio_fourier_transform_quantity//2)
-        outputs = Dense(out_dim)(bidirectional_gru)
-        return outputs
-
-# Tensorflow underlying code to support Bahdanau attention
+# TODO: what is reuse meant for ?
+# TODO: why the except clause
+# TODO: paper mentions stateful recurrent layer to produce attention query @ each timestep
+# Bahdanau attention from tf.contrib.seq2seq
 def attention(inputs, memory, num_units=CONFIG.embed_size, variable_scope="attention_decoder", reuse=None):
     
     def attend(input_and_memory):
@@ -79,20 +78,16 @@ def attention(inputs, memory, num_units=CONFIG.embed_size, variable_scope="atten
             try:
                 v = tf.get_variable("v", [1])
             except ValueError:
-                scope.reuse_variables()
-            # The attention component will be in control of attending to the given memory
-            attention = tf.contrib.seq2seq.BahdanauAttention(num_units, memory)
-            #reuse=True
+                scope.reuse_variables()            
+            # Attention and RNN layers
             cell = tf.contrib.rnn.GRUCell(num_units)
-
+            attention = tf.contrib.seq2seq.BahdanauAttention(num_units, memory)
+            # Attention and RNN wrapper
             cell_with_attention = tf.contrib.seq2seq.DynamicAttentionWrapper(cell, attention, num_units)
-            #second output is the state, paper mentions we want a stateful recurrent
-            #layer to produce the attn query at each decoder timestep, so might need to use it
-            outputs, _ = tf.nn.dynamic_rnn(cell_with_attention, inputs, dtype=tf.float32)
+            outputs, state = tf.nn.dynamic_rnn(cell_with_attention, inputs, dtype=tf.float32)
             return outputs
 
-    # output should be [batches, timesteps, num_units]
-    #return Lambda(attend, output_shape=(b,t,num_units))(inputs, memory)
+    # Shape must equal [batches, timesteps, num_units]
     return Lambda(attend)([inputs, memory])
 
 def encoder(inputs):
@@ -116,16 +111,20 @@ def convolutional_bank(inputs, decoding=False):
         convolutions = Concatenate()([convolutions, conv])
     return convolutions
 
+def plain_network(inputs, num_layers=1):
+    for i in range(num_layers):
+        inputs = Dense(CONFIG.embed_size // 2, activation='relu')(inputs)
+    return inputs
+
 def highway_network(inputs, num_layers=1):
     # https://arxiv.org/pdf/1505.00387.pdf
     # output = H(input,WH) * T(input,WT) + input * C(x,WC)
-    layer_inputs = inputs
     for i in range(num_layers):
-        H = Dense(CONFIG.embed_size // 2, activation='relu')(layer_inputs)
-        T = Dense(CONFIG.embed_size // 2, activation='sigmoid', use_bias=True, bias_initializer=Constant(-1))(layer_inputs)
+        H = Dense(CONFIG.embed_size // 2, activation='relu')(inputs)
+        T = Dense(CONFIG.embed_size // 2, activation='sigmoid', use_bias=True, bias_initializer=Constant(-1))(inputs)
         C = Lambda(lambda x: 1. - x)(T)
-        layer_inputs = Add()([Multiply()([H, T]), Multiply()([inputs, C])])
-    return layer_inputs
+        inputs = Add()([Multiply()([H, T]), Multiply()([inputs, C])])
+    return inputs
 
 def encoder_cbhg(inputs, residual_input=None):
     # convolutional bank

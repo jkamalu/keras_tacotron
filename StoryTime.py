@@ -31,11 +31,8 @@ class StorytimeArchitecture:
         # Decoder
         self.go_frame = tf.zeros(shape=tf.shape(self.mel_targets_placeholder))
 
-        # Mel spectrogram output
-        self.model_output_mel = components.seq_decoder(self.go_frame, self.memory)
-
-        # Magnitude spectrogram output
-        self.model_output_mag = components.decoder_cbhg(self.model_output_mel)
+        # Mel/Mag spectrogram output
+        self.model_output_mel, self.model_output_mag = components.decoder(self.go_frame, self.encoder_output)
 
     def placeholders(self):
         self.inputs_placeholder = K.placeholder(shape=(None, None, CONFIG.embed_size))
