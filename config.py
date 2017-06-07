@@ -3,7 +3,9 @@ class CONFIG:
     num_epochs = 10
     batch_size = 32
 
-    max_seq_length = 500
+    max_audio_length = 11 # seconds
+    #max_seq_length = 500
+    max_seq_length = max_audio_length*81 # 81 frames/second ratio between audio and spectrograms
 
     embed_size = 256
     dropout = 0.5

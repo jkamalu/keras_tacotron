@@ -4,6 +4,11 @@ import re
 from keras.preprocessing.text import one_hot
 from config import CONFIG
 import audio
+import utils
+import wave
+import collections
+import os
+import contextlib
 
 # input -> raw text string
 # output -> a numpy matrix of (seqlens, 256)
@@ -22,38 +27,38 @@ def text_to_sequence(text):
 
     return matrix
 
-def load_texts(dir_str):
-    i = 0
-    texts = []
-    while True:
-        file_path = "%s/text/%s.txt" % (dir_str, i)
-        try:
-            file = open(file_path)
-            text = file.read()
-        except IOError as err: break
-        texts.append(text_to_sequence(text))
-        i += 1
-    return texts
-
-def load_sounds(dir_str):
-    i = 0
-    mels = []
-    mags = []
-    while True:
-        file_path = "%s/sound/%s.wav" % (dir_str, i)
-        try:
-            mel, mag = audio.get_spectrograms(file_path)
-        except IOError as err: break
-        mels.append(mel)
-        mags.append(mag)
-        i += 1
-    return mels, mags
+# def load_texts(dir_str):
+#     i = 0
+#     texts = []
+#     while True:
+#         file_path = "%s/text/%s.txt" % (dir_str, i)
+#         try:
+#             file = open(file_path)
+#             text = file.read()
+#         except IOError as err: break
+#         texts.append(text_to_sequence(text))
+#         i += 1
+#     return texts
+#
+# def load_sounds(dir_str):
+#     i = 0
+#     mels = []
+#     mags = []
+#     while True:
+#         file_path = "%s/sound/%s.wav" % (dir_str, i)
+#         try:
+#             mel, mag = audio.get_spectrograms(file_path)
+#         except IOError as err: break
+#         mels.append(mel)
+#         mags.append(mag)
+#         i += 1
+#     return mels, mags
 
 def make_batch(batch_items, axis_one_dim, spectrogram=False):
     batch_items_padded = []
 
     # Get max seq len for text batch
-    batch_items_max_len = 0 
+    batch_items_max_len = 0
     for matrix in batch_items:
         if matrix.shape[0] > batch_items_max_len:
             batch_items_max_len = matrix.shape[0]
@@ -105,8 +110,42 @@ def make_batches(texts, mels, mags, batch_size):
     return text_batches, mel_batches, mag_batches
 
 def load_data(dir_str, batch_size=CONFIG.batch_size):
-    texts = load_texts(dir_str)
-    mels, mags = load_sounds(dir_str)
+    texts = []
+    mels = []
+    mags = []
+
+    # For housekeeping, keep track of the spectrogram length
+    # Bucketed to nearest 100
+    spectrogramsLength = collections.defaultdict(int)
+
+    # All possible combinations of books and chapters
+    for b in range(1,7+1):
+        for ch in range(1,50):
+            # Chapter doesn't exist
+            if not os.path.isfile("books/book%d/ch%d.txt" % (b, ch)): continue
+
+            chapterSentences = utils.getSentences(b,ch)
+            for i, s in enumerate(chapterSentences):
+                print("Processing book %d, chapter %d, sentence %d" % (b, ch, i))
+
+                # Sentence audio clip doesn't exist
+                audioFilename = "audio/book%d/ch%d/s%d.wav" % (b, ch, i)
+                if not os.path.isfile(audioFilename): continue
+
+                text = ' '.join(s)
+                mel, mag = audio.get_spectrograms(audioFilename)
+
+                # Make sure the length of the file fits our requirements
+                if mel.shape[0] > CONFIG.max_seq_length:
+                    print("Skipping (too long) - %s", audioFilename)
+                    continue
+
+                texts.append(text_to_sequence(text))
+                mels.append(mel)
+                mags.append(mag)
+
+    #texts = load_texts(dir_str)
+    #mels, mags = load_sounds(dir_str)
     text_batches, mel_batches, mag_batches = make_batches(texts, mels, mags, batch_size)
     return (text_batches, mel_batches, mag_batches)
 
