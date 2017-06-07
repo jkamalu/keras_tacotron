@@ -32,15 +32,7 @@ class StorytimeArchitecture:
         go_frame = tf.zeros(shape=tf.shape(self.mel_targets_placeholder))
         
         decoder_input = K.in_train_phase(self.mel_targets_placeholder, go_frame)
-        decoder_input = tf.identity(decoder_input, name="decoder_input")
         self.model_output_mel, self.model_output_mag = components.decoder(decoder_input, self.encoder_output)
-        print("MELS:")
-        print(self.model_output_mel)
-        print(self.mel_targets_placeholder)
-        print("")
-        print("MAGS:")
-        print(self.model_output_mag)
-        print(self.mag_targets_placeholder)
 
     def placeholders(self):
         self.inputs_placeholder = K.placeholder(shape=(None, None, CONFIG.embed_size))

@@ -21,9 +21,9 @@ def decoder(inputs, memory):
     # padded_inputs = Concatenate(axis=1)([inputs, padding])
     # print("padded inputs: %s" % padded_inputs)
 
-    attention_cell = tf.contrib.rnn.GRUCell(CONFIG.embed_size)
     with tf.variable_scope("attention_decoder"):
-        attention = tf.contrib.seq2seq.BahdanauAttention(CONFIG.embed_size, memory)
+        # attention = tf.contrib.seq2seq.BahdanauAttention(CONFIG.embed_size, memory)
+        attention_cell = tf.contrib.rnn.AttentionCellWrapper(tf.contrib.rnn.GRUCell(CONFIG.embed_size), CONFIG.attn_length)
     decoder_gru_1 = tf.contrib.rnn.GRUCell(CONFIG.embed_size)
     decoder_gru_2 = tf.contrib.rnn.ResidualWrapper(tf.contrib.rnn.GRUCell(CONFIG.embed_size))
 
@@ -49,11 +49,11 @@ def decoder(inputs, memory):
                 prenet_output = tf.layers.dense(prenet_output, CONFIG.embed_size // 2)
                 prenet_output = tf.nn.dropout(prenet_output, CONFIG.dropout)
 
-            with tf.variable_scope("attention_cell"):
-                attention_cell_output, attention_cell_state = attention_cell(prenet_output, states[0])
+            # with tf.variable_scope("attention_cell"):
+            #     attention_cell_output, attention_cell_state = attention_cell(prenet_output, states[0])
 
             with tf.variable_scope("attention_decoder") as scope:
-                context = attention(attention_cell_output)
+                attention_cell_output, attention_cell_state = attention_cell(prenet_output, states[0])
 
             with tf.variable_scope("decoder-cells"):
                 with tf.variable_scope("cell-1"):
@@ -66,7 +66,6 @@ def decoder(inputs, memory):
             with tf.variable_scope("mel-frames"):
                 # mel_frame = Dense(CONFIG.audio_mel_banks)(decoder_gru_2_res)
                 mel_frame = tf.layers.dense(decoder_gru_2_res, CONFIG.audio_mel_banks)
-                print("mel frame: %s" % mel_frame)
                 for r_step in range(CONFIG.reduction_factor):
                     mel_sections = mel_sections.write(l_step + r_step, mel_frame)
 
@@ -75,10 +74,8 @@ def decoder(inputs, memory):
 
         __, mel_output, __ = tf.while_loop(condition, decoder_body, (step, mel_sections, states))
         mel_output = mel_output.stack()
-        print("mel stack: %s" % mel_output)
 
     mel_output = tf.reshape(mel_output, [batch_size, total_steps, CONFIG.audio_mel_banks])
-    print("mel reshape: %s" % mel_output)
     mag_output = decoder_cbhg(mel_output, mel_output)
     return (mel_output, mag_output)
 

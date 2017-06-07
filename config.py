@@ -8,6 +8,8 @@ class CONFIG:
     embed_size = 256
     dropout = 0.5
 
+    attn_length = 5
+
     learning_rate = 0.001
 
     num_conv_regions = 16
