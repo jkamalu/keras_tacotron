@@ -82,11 +82,18 @@ if __name__ == "__main__":
         minLoss = float("inf")
         while not os.path.isfile("stop_train"):
             i += 1
+
+            totalLoss = 0.0
+            lossBatches = 0
+
             generate_batch = data.generate_batch(train_feature_batches, train_mel_batches, train_mag_batches)
             for features, mel_targets, mag_targets in generate_batch:
                 feed_dict = architecture.feed_dict(features, mel_targets, mag_targets, is_training=True)
                 #optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
                 _, loss, mag = sess.run([optimizer, total_loss, architecture.model_output_mag], feed_dict=feed_dict)
+
+                totalLoss += loss
+                lossBatches += 1
 
                 # We should generate current output on this iteration
                 # This only makes sense if we are training on one example, so we can expect
@@ -97,10 +104,11 @@ if __name__ == "__main__":
                                         CONFIG.audio_sample_rate, \
                                         audio.spectrogram2wav(mag))
 
-            if loss < minLoss:
+            averageLoss = totalLoss / lossBatches
+            if averageLoss < minLoss:
                 print("Writing min loss")
-                minLoss = loss
-                saver.save(sess, "./models/model_gs_%d_loss_%f" % (i, loss), global_step=i)
+                minLoss = averageLoss
+                saver.save(sess, "./models/model_gs_%d_loss_%f" % (i, averageLoss), global_step=i)
 
             # Save model
             #saver.save(sess, args.save_model_file, global_step=i)
