@@ -30,7 +30,7 @@ class StorytimeArchitecture:
 
         # Decoder
         go_frame = tf.zeros(shape=tf.shape(self.mel_targets_placeholder))
-        
+
         decoder_input = K.in_train_phase(self.mel_targets_placeholder, go_frame)
         self.model_output_mel, self.model_output_mag = components.decoder(decoder_input, self.encoder_output)
 
@@ -72,12 +72,14 @@ if __name__ == "__main__":
 
     init_op = tf.global_variables_initializer()
     saver = tf.train.Saver(tf.trainable_variables())
+    #train_writer = tf.summary.FileWriter('./logdir/train', architecture.graph)
     sess.run(init_op)
 
     with sess.as_default():
         #Train model
         #for i in range(CONFIG.num_epochs):
         i = 0
+        minLoss = float("inf")
         while not os.path.isfile("stop_train"):
             i += 1
             generate_batch = data.generate_batch(train_feature_batches, train_mel_batches, train_mag_batches)
@@ -95,6 +97,12 @@ if __name__ == "__main__":
                                         CONFIG.audio_sample_rate, \
                                         audio.spectrogram2wav(mag))
 
+            if loss < minLoss:
+                print("Writing min loss")
+                minLoss = loss
+                saver.save(sess, "./models/model_gs_%d_loss_%f" % (i, loss), global_step=i)
+
             # Save model
             #saver.save(sess, args.save_model_file, global_step=i)
+            #train_writer.add_summary(summary, gs)
             print("Epoch %s finished with train loss %.2f" % (i, loss))
