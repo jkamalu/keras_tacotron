@@ -32,7 +32,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    sess=tf.Session() 
+    sess=tf.Session()
     saver = tf.train.import_meta_graph('%s.meta' % args.modelFilename)
     saver.restore(sess, args.modelFilename)
     sess.run(tf.global_variables_initializer())
@@ -55,6 +55,3 @@ if __name__ == "__main__":
     print("Start spec to wav")
 
     wavfile.write(args.text, config.audio_sample_rate, audio.spectrogram2wav(mag_spectrogram))
-
-
-

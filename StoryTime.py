@@ -19,6 +19,8 @@ import audio
 class StorytimeArchitecture:
 
     def __init__(self):
+        self.graph = tf.Graph()
+
         # Placeholders
         self.placeholders()
 
@@ -68,17 +70,25 @@ if __name__ == "__main__":
     mel_loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.mel_targets_placeholder, architecture.model_output_mel))
     mag_loss = tf.reduce_mean(tf.losses.absolute_difference(architecture.mag_targets_placeholder, architecture.model_output_mag))
     total_loss = mel_loss + mag_loss
+
+    # Summmary
+    tf.summary.scalar('mel_loss', mel_loss)
+    tf.summary.scalar('mag_loss', mag_loss)
+    tf.summary.scalar('total_loss', total_loss)
+    merged = tf.summary.merge_all()
+
     optimizer = tf.train.AdamOptimizer(CONFIG.learning_rate).minimize(total_loss)
 
     init_op = tf.global_variables_initializer()
     saver = tf.train.Saver(tf.trainable_variables())
-    #train_writer = tf.summary.FileWriter('./logdir/train', architecture.graph)
+    train_writer = tf.summary.FileWriter('./logdir/train', architecture.graph)
     sess.run(init_op)
 
     with sess.as_default():
         #Train model
         #for i in range(CONFIG.num_epochs):
         i = 0
+        gs = 0
         minLoss = float("inf")
         while not os.path.isfile("stop_train"):
             i += 1
@@ -88,9 +98,13 @@ if __name__ == "__main__":
 
             generate_batch = data.generate_batch(train_feature_batches, train_mel_batches, train_mag_batches)
             for features, mel_targets, mag_targets in generate_batch:
+                gs += 1
+
                 feed_dict = architecture.feed_dict(features, mel_targets, mag_targets, is_training=True)
                 #optimizer.run(feed_dict=architecture.feed_dict(features, targets, is_training=True))
-                _, loss, mag = sess.run([optimizer, total_loss, architecture.model_output_mag], feed_dict=feed_dict)
+                _, loss, mag, summary = sess.run([optimizer, total_loss, architecture.model_output_mag, merged], feed_dict=feed_dict)
+
+                train_writer.add_summary(summary, gs)
 
                 totalLoss += loss
                 lossBatches += 1
@@ -108,9 +122,9 @@ if __name__ == "__main__":
             if averageLoss < minLoss:
                 print("Writing min loss")
                 minLoss = averageLoss
-                saver.save(sess, "./models/model_gs_%d_loss_%f" % (i, averageLoss), global_step=i)
+                saver.save(sess, "./models/model_gs_%d_loss_%f" % (i, averageLoss), global_step=gs)
 
             # Save model
             #saver.save(sess, args.save_model_file, global_step=i)
             #train_writer.add_summary(summary, gs)
-            print("Epoch %s finished with train loss %.2f" % (i, loss))
+            print("Epoch %d GS %d finished with train loss %.2f" % (i, gs, loss))

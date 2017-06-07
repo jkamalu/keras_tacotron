@@ -3,3 +3,5 @@ test.txt
 *.wav
 checkpoint
 models*
+models
+logdir
